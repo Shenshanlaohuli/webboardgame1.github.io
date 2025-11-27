@@ -263,8 +263,8 @@
         /* 计分牌：显示中央数字，并不透明，大小适中 */
         .card.mini-card .card-center {
             display: block;
-            font-size: 14px; /* 适中的字体 */
-            opacity: 1;      /* 完全不透明 */
+            font-size: 14px;
+            opacity: 1;      
             font-weight: bold;
         }
 
@@ -751,7 +751,7 @@
             cardEl.classList.add('trick-card');
             
             let count = state.currentTrick.length;
-            let offset = (index - (count - 1)/2) * 35;
+            let offset = (index - (count - 1)/2) * 13;
             
             cardEl.style.transform = `translateX(${offset}px)`;
             cardEl.style.zIndex = index;
