@@ -260,7 +260,7 @@
             display: none; 
         }
         
-        /* 计分牌：显示中央数字，并不透明，大小适中 */
+        /* 计分牌：显示中央数字 */
         .card.mini-card .card-center {
             display: block;
             font-size: 14px;
@@ -283,6 +283,19 @@
             background: rgba(0,0,0,0.6);
             padding: 2px 6px;
             border-radius: 4px;
+        }
+
+        /* --- 消除动画样式 --- */
+        @keyframes shakeCard {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-3px) rotate(-5deg); }
+            50% { transform: translateX(3px) rotate(5deg); }
+            75% { transform: translateX(-3px) rotate(-5deg); }
+            100% { transform: translateX(0); }
+        }
+
+        .shake {
+            animation: shakeCard 0.4s ease-in-out infinite;
         }
 
         /* 花色颜色 */
@@ -590,7 +603,13 @@
         });
 
         document.getElementById('status-text').innerText = `${winner.name} 赢了!`;
-        processPairs(winner);
+        
+        // 先更新一次UI让用户看到拿回来的牌
+        updateUI();
+
+        // 检查对子并播放动画
+        const animationDuration = processPairs(winner);
+        const waitTime = animationDuration > 0 ? 1500 : 1500;
 
         setTimeout(() => {
             state.currentTrick = [];
@@ -603,27 +622,79 @@
             } else {
                 playTurn();
             }
-        }, 1500);
+        }, waitTime);
     }
 
     function processPairs(player) {
+        // 1. 计算需要消除的卡牌
         let counts = {};
-        player.loot.forEach(c => {
-            counts[c.value] = (counts[c.value] || 0) + 1;
-        });
+        player.loot.forEach(c => counts[c.value] = (counts[c.value] || 0) + 1);
         
-        let newLoot = [];
+        let pairsFound = false;
+
+        // 2. 在UI上标记要消除的卡牌
+        const lootContainer = document.getElementById(`loot-${player.id}`);
+        if (!lootContainer) return 0;
+
+        const cardEls = Array.from(lootContainer.children);
+        
+        // 为了准确找到DOM元素，我们需要根据值分组
+        let valueToEls = {};
+        cardEls.forEach(el => {
+            // 获取中央数字的文本 (因为迷你牌只显示 .card-center)
+            const centerEl = el.querySelector('.card-center');
+            if(centerEl) {
+                const val = parseInt(centerEl.innerText);
+                if(!valueToEls[val]) valueToEls[val] = [];
+                valueToEls[val].push(el);
+            }
+        });
+
         for (let valStr in counts) {
             let val = parseInt(valStr);
             let count = counts[valStr];
-            let keep = count % 2;
+            // 需要移除的数量 (成对移除)
+            let removeCount = Math.floor(count / 2) * 2;
             
-            if (keep > 0) {
-                let cardsOfVal = player.loot.filter(c => c.value === val);
-                newLoot.push(cardsOfVal[0]); 
+            if (removeCount > 0 && valueToEls[val]) {
+                pairsFound = true;
+                // 标记最后进入的N张牌 (倒序标记)
+                for (let i = 0; i < removeCount; i++) {
+                    // 从数组末尾取元素（因为新牌通常在后面）
+                    let el = valueToEls[val].pop(); 
+                    if (el) {
+                        el.classList.add('shake');
+                        // 移除了红色大叉号的创建
+                    }
+                }
             }
         }
-        player.loot = newLoot;
+
+        // 3. 延迟后更新数据（实际移除）
+        if (pairsFound) {
+            setTimeout(() => {
+                let newLoot = [];
+                // 重新计算保留的牌
+                let currentCounts = {}; 
+                player.loot.forEach(c => currentCounts[c.value] = (currentCounts[c.value] || 0) + 1);
+                
+                for (let valStr in currentCounts) {
+                    let val = parseInt(valStr);
+                    let count = currentCounts[valStr];
+                    let keep = count % 2; 
+                    
+                    if (keep > 0) {
+                        let card = player.loot.find(c => c.value === val);
+                        newLoot.push(card);
+                    }
+                }
+                player.loot = newLoot;
+                // 不需要在这里调用updateUI，外层resolveTrick的timeout会调用
+            }, 1200);
+            return 1200; // 返回动画持续时间
+        }
+        
+        return 0;
     }
 
     function endRound() {
@@ -727,6 +798,10 @@
             document.getElementById(`score-val-${p.id}`).innerText = p.totalScore;
 
             const lootDiv = document.getElementById(`loot-${p.id}`);
+            // 在对子消除动画播放期间，我们不希望完全重绘loot区域，否则动画元素会丢失
+            // 但 updateUI 通常在出牌时调用，此时还没有消除动画。
+            // 只有在 resolveTrick 且有消除时才会有冲突。
+            // 我们简单的逻辑是：每次全量刷新。processPairs会在全量刷新后手动添加动画DOM。
             lootDiv.innerHTML = '';
             let sortedLoot = [...p.loot].sort((a,b) => a.value - b.value);
             sortedLoot.forEach(card => {
@@ -751,7 +826,7 @@
             cardEl.classList.add('trick-card');
             
             let count = state.currentTrick.length;
-            let offset = (index - (count - 1)/2) * 13;
+            let offset = (index - (count - 1)/2) * 24;
             
             cardEl.style.transform = `translateX(${offset}px)`;
             cardEl.style.zIndex = index;
