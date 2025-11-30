@@ -115,14 +115,18 @@
             z-index: 60;
         }
         
-        /* 电脑玩家位置 */
+        /* 电脑玩家位置 - 针对 4人局 进行了优化 */
+        
+        /* 3人: 左上, 右上 (避开顶部信息条) */
         body.players-3 #p1 { top: 70px; left: 10px; }
         body.players-3 #p2 { top: 70px; right: 10px; }
 
-        body.players-4 #p1 { top: 42%; left: 5px; transform: translateY(-50%); }
+        /* 4人: 左侧和右侧向上移到 25% 的高度，避免和中央牌区重叠 */
+        body.players-4 #p1 { top: 25%; left: 5px; transform: translateY(-50%); }
         body.players-4 #p2 { top: 70px; left: 50%; transform: translateX(-50%); }
-        body.players-4 #p3 { top: 42%; right: 5px; transform: translateY(-50%); }
+        body.players-4 #p3 { top: 25%; right: 5px; transform: translateY(-50%); }
 
+        /* 5人: 保持不变 */
         body.players-5 #p1 { bottom: 200px; left: 5px; }
         body.players-5 #p2 { top: 70px; left: 15px; }
         body.players-5 #p3 { top: 70px; right: 15px; }
@@ -197,7 +201,8 @@
         /* 中央出牌区 */
         #trick-area {
             position: absolute;
-            top: 45%; left: 50%;
+            top: 52%; /* 稍微下移一点点，给上方更多空间 */
+            left: 50%;
             transform: translate(-50%, -50%);
             width: 100%; height: 160px;
             display: flex;
@@ -664,7 +669,6 @@
                     let el = valueToEls[val].pop(); 
                     if (el) {
                         el.classList.add('shake');
-                        // 移除了红色大叉号的创建
                     }
                 }
             }
@@ -689,7 +693,6 @@
                     }
                 }
                 player.loot = newLoot;
-                // 不需要在这里调用updateUI，外层resolveTrick的timeout会调用
             }, 1200);
             return 1200; // 返回动画持续时间
         }
@@ -707,6 +710,7 @@
                 if (c.value < 0 || c.value > 0) roundScore += c.value;
             });
             p.totalScore += roundScore;
+            if (p.totalScore < 0) p.totalScore = 0; // 保证不为负分
         });
 
         checkGameOver();
@@ -826,7 +830,7 @@
             cardEl.classList.add('trick-card');
             
             let count = state.currentTrick.length;
-            let offset = (index - (count - 1)/2) * 14;
+            let offset = (index - (count - 1)/2) * 24;
             
             cardEl.style.transform = `translateX(${offset}px)`;
             cardEl.style.zIndex = index;
